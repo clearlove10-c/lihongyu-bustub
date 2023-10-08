@@ -207,6 +207,6 @@ class BufferPoolManager {
     // This is a no-nop right now without a more complex data structure to track deallocated pages
   }
 
-  // TODO(student): You may add additional private members and helper functions
+  auto GetFreeFrame(frame_id_t *frame_id) -> bool;
 };
 }  // namespace bustub
