@@ -98,6 +98,18 @@ class BPlusTreeInternalPage : public BPlusTreePage {
     return kstr;
   }
 
+  auto IsFull() const -> bool { return GetSize() == GetMaxSize(); }
+
+  void InsertKV(int index, const KeyType &key, const ValueType &value);
+
+  void DeleteKV(int index);
+
+  auto KVAt(int index) const -> const MappingType &;
+
+  void InsertKVOverflow(int index, const KeyType &key, const ValueType &value);
+
+  auto FindKeyPosition(KeyType key, const KeyComparator &cmp) -> int;
+
  private:
   // Flexible array member for page data.
   MappingType array_[0];

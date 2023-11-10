@@ -11,21 +11,25 @@
 #pragma once
 
 #include <algorithm>
+#include <atomic>
 #include <deque>
 #include <iostream>
 #include <optional>
 #include <queue>
 #include <shared_mutex>
+#include <stack>
 #include <string>
 #include <vector>
 
 #include "common/config.h"
 #include "common/macros.h"
 #include "concurrency/transaction.h"
+#include "execution/expressions/comparison_expression.h"
 #include "storage/index/index_iterator.h"
 #include "storage/page/b_plus_tree_header_page.h"
 #include "storage/page/b_plus_tree_internal_page.h"
 #include "storage/page/b_plus_tree_leaf_page.h"
+#include "storage/page/b_plus_tree_page.h"
 #include "storage/page/page_guard.h"
 
 namespace bustub {
@@ -47,11 +51,28 @@ class Context {
   // Save the root page id here so that it's easier to know if the current page is the root page.
   page_id_t root_page_id_{INVALID_PAGE_ID};
 
+  page_id_t current_page_id_{INVALID_PAGE_ID};
+
   // Store the write guards of the pages that you're modifying here.
   std::deque<WritePageGuard> write_set_;
 
   // You may want to use this when getting value, but not necessary.
   std::deque<ReadPageGuard> read_set_;
+
+  std::deque<int> index_set_;
+
+  ReadPageGuard current_read_guard_;
+  ReadPageGuard previous_read_guard_;
+
+  WritePageGuard current_write_guard_;
+
+  WritePageGuard header_write_guard_;
+
+  bool is_root_safe_ = false;
+
+  bool is_tree_empty_ = false;
+
+  auto IsRootLeaf() -> bool { return current_page_id_ == root_page_id_; }
 
   auto IsRootPage(page_id_t page_id) -> bool { return page_id == root_page_id_; }
 };
@@ -141,6 +162,24 @@ class BPlusTree {
    */
   auto ToPrintableBPlusTree(page_id_t root_id) -> PrintableBPlusTree;
 
+  auto GetLeafPageWrite(const KeyType &key, Context &ctx) -> LeafPage *;
+  // auto GetLeafPageRead(const KeyType &key, Context &ctx) -> LeafPage *;
+  auto GetLeafPageOptimistic(const KeyType &key, Context &ctx) -> LeafPage *;
+  auto GetLeafPageDeletePessimistic(const KeyType &key, Context &ctx) -> LeafPage *;
+  auto GetLeafPageInsertPessimistic(const KeyType &key, Context &ctx) -> LeafPage *;
+
+  void GetLeafPageRead(const KeyType &key, Context &ctx);
+  void GetLeafPageInsert(const KeyType &key, Context &ctx);
+  void GetLeafPageDelete(const KeyType &key, Context &ctx);
+
+  auto GetBrotherNode(InternalPage *child, InternalPage *parent, bool &is_rightmost) -> page_id_t;
+  auto GetIndexOfChild(KeyType child_key_max, const InternalPage *parent) -> int;
+
+  auto GetBrotherPageID(const BPlusTreePage *child, const InternalPage *parent, bool &is_right_brother) -> page_id_t;
+  auto IsRightmostChild(const BPlusTreePage *child, const InternalPage *parent) -> bool;
+
+  void UpdateRootPageId(page_id_t root_page_id, WritePageGuard &header_guard);
+
   // member variable
   std::string index_name_;
   BufferPoolManager *bpm_;
@@ -149,6 +188,10 @@ class BPlusTree {
   int leaf_max_size_;
   int internal_max_size_;
   page_id_t header_page_id_;
+  // for test use
+  std::atomic<int> count_ = 0;
+  std::mutex mutex_;
+  std::shared_mutex root_mutex_;
 };
 
 /**

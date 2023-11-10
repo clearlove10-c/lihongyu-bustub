@@ -19,6 +19,7 @@
 #include <limits>
 #include <list>
 #include <mutex>  // NOLINT
+#include <shared_mutex>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -163,6 +164,7 @@ class LRUKReplacer {
   size_t replacer_size_;
   size_t k_;
   std::mutex latch_;
+  std::shared_mutex latch_shared_;
   // 链表尾部为距离最大的（时间戳最小的）
   std::list<LRUKNode> lru_list_{};
   std::list<LRUKNode> inf_lru_list_{};

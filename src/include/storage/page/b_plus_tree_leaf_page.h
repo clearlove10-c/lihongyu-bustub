@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "storage/page/b_plus_tree_page.h"
+#include "storage/page/hash_table_page_defs.h"
 
 namespace bustub {
 
@@ -55,6 +56,18 @@ class BPlusTreeLeafPage : public BPlusTreePage {
   auto GetNextPageId() const -> page_id_t;
   void SetNextPageId(page_id_t next_page_id);
   auto KeyAt(int index) const -> KeyType;
+  auto ValueAt(int index) const -> ValueType;
+  auto IsFull() -> bool;
+
+  void InsertKV(int index, const KeyType &key, const ValueType &value);
+
+  void DeleteKV(int index);
+
+  void RedistributeSingleKV(BPlusTreeLeafPage &brother);
+
+  auto KVAt(int index) const -> const MappingType &;
+
+  auto FindKeyPosition(KeyType key, const KeyComparator &cmp) -> int;
 
   /**
    * @brief For test only return a string representing all keys in
