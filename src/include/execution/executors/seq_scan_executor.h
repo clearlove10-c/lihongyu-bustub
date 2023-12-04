@@ -12,14 +12,19 @@
 
 #pragma once
 
-#include <vector>
+#include <optional>
 
+#include "catalog/catalog.h"
 #include "execution/executor_context.h"
 #include "execution/executors/abstract_executor.h"
 #include "execution/plans/seq_scan_plan.h"
+#include "storage/table/table_iterator.h"
 #include "storage/table/tuple.h"
 
 namespace bustub {
+
+#define DEBUG_INTO_FUNCTION() std::cout << "----Into Function: " << __FUNCTION__ << "----" << std::endl;
+#define DEBUG_LEAVE_FUNCTION() std::cout << "----Leave Function: " << __FUNCTION__ << "----" << std::endl;
 
 /**
  * The SeqScanExecutor executor executes a sequential table scan.
@@ -50,5 +55,9 @@ class SeqScanExecutor : public AbstractExecutor {
  private:
   /** The sequential scan plan node to be executed */
   const SeqScanPlanNode *plan_;
+
+  TableInfo *tabel_info_{};
+
+  std::optional<TableIterator> iter_ = std::nullopt;
 };
 }  // namespace bustub

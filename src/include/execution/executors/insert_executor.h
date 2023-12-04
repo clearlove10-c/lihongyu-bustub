@@ -14,7 +14,10 @@
 
 #include <memory>
 #include <utility>
+#include <vector>
 
+#include "catalog/catalog.h"
+#include "concurrency/transaction.h"
 #include "execution/executor_context.h"
 #include "execution/executors/abstract_executor.h"
 #include "execution/plans/insert_plan.h"
@@ -57,6 +60,17 @@ class InsertExecutor : public AbstractExecutor {
  private:
   /** The insert plan node to be executed*/
   const InsertPlanNode *plan_;
+  /** The child executor from which tuples are obtained */
+  std::unique_ptr<AbstractExecutor> child_executor_;
+
+  TableInfo *table_info_{};
+
+  std::vector<IndexInfo *> indexes_info_{};
+
+  Transaction *ts_;
+
+  bool inserted_ = false;
+  // 子执行器value是什么？ 是包含了整个insert 插入的tuple的数组，每次调用next都会给新的tuple
 };
 
 }  // namespace bustub

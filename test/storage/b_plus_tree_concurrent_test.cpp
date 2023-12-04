@@ -479,7 +479,7 @@ TEST(BPlusTreeConcurrentTest, MyMixTest) {
   (void)header_page;
 
   // create b+ tree
-  BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", page_id, bpm, comparator,3,5);
+  BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", page_id, bpm, comparator, 3, 5);
 
   // Add perserved_keys
   std::vector<int64_t> perserved_keys;

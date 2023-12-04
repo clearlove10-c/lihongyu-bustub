@@ -12,6 +12,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <memory>
 #include <vector>
 
@@ -50,7 +51,15 @@ class SortExecutor : public AbstractExecutor {
   auto GetOutputSchema() const -> const Schema & override { return plan_->OutputSchema(); }
 
  private:
+  void InitTupleSet();
+
+ private:
   /** The sort plan node to be executed */
   const SortPlanNode *plan_;
+
+  std::vector<Tuple> set_{};
+  size_t current_cursor_ = 0;
+
+  std::unique_ptr<AbstractExecutor> child_executor_;
 };
 }  // namespace bustub

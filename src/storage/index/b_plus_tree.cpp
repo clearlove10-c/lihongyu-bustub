@@ -30,8 +30,6 @@ BPLUSTREE_TYPE::BPlusTree(std::string name, page_id_t header_page_id, BufferPool
   WritePageGuard guard = bpm_->FetchPageWrite(header_page_id_);
   auto root_page = guard.AsMut<BPlusTreeHeaderPage>();
   root_page->root_page_id_ = INVALID_PAGE_ID;
-  // for test use
-  std::cout << "leaf_max_size: " << leaf_max_size << " internal_max_size: " << internal_max_size << std::endl;
 }
 
 /*
