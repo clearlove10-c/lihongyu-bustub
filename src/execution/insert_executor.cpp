@@ -12,7 +12,11 @@
 
 #include <memory>
 
+#include "common/exception.h"
 #include "common/macros.h"
+#include "concurrency/lock_manager.h"
+#include "concurrency/transaction.h"
+#include "concurrency/transaction_manager.h"
 #include "execution/executors/insert_executor.h"
 #include "execution/executors/seq_scan_executor.h"
 
@@ -31,10 +35,13 @@ void InsertExecutor::Init() {
   indexes_info_ = catalog->GetTableIndexes(table_info_->name_);
   ts_ = this->GetExecutorContext()->GetTransaction();
 
-  // DEBUG_INTO_FUNCTION();
-  // std::string table_name = table_info_->name_;
-  // std::cout << "table name: " << table_name << std::endl;
-  // std::cout << "index count in table: " << indexes_info_.size() << std::endl;
+  auto lock_manager = this->GetExecutorContext()->GetLockManager();
+  BUSTUB_ASSERT(lock_manager != nullptr, "lock manager is null");
+  try {
+    lock_manager->LockTable(ts_, LockManager::LockMode::INTENTION_EXCLUSIVE, table_oid);
+  } catch (TransactionAbortException &) {
+    throw ExecutionException("fail to lock table");
+  }
 }
 
 auto InsertExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
@@ -47,10 +54,12 @@ auto InsertExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
   // Get the next tuple
   bool status = child_executor_->Next(&child_tuple, rid);
   while (status) {
-    auto insert_rid = table_info_->table_->InsertTuple(meta, child_tuple);
+    auto lock_manager = this->GetExecutorContext()->GetLockManager();
+    auto insert_rid = table_info_->table_->InsertTuple(meta, child_tuple, lock_manager, ts_, plan_->table_oid_);
     if (insert_rid == std::nullopt) {
       return false;
     }
+    ts_->AppendTableWriteRecord(TableWriteRecord(ts_->GetTransactionId(), *insert_rid, table_info_->table_.get()));
     // 每次插入都要更新index （之前没有导致只能查到最后一次插入）
     // TODO(smlz) update index (check here)
     // 插入索引的键（tuple）需要用KeyFromTuple来获取

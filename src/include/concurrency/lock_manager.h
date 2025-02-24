@@ -15,8 +15,10 @@
 #include <algorithm>
 #include <condition_variable>  // NOLINT
 #include <list>
+#include <map>
 #include <memory>
 #include <mutex>  // NOLINT
+#include <optional>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -62,6 +64,8 @@ class LockManager {
     bool granted_{false};
   };
 
+  // 这个应该是所有请求（不管是否被授予锁资源）都要加入queue，释放时再离开队列
+  // 某个资源的锁请求队列
   class LockRequestQueue {
    public:
     /** List of lock requests for the same resource (table or row) */
@@ -72,6 +76,15 @@ class LockManager {
     txn_id_t upgrading_ = INVALID_TXN_ID;
     /** coordination */
     std::mutex latch_;
+  };
+
+  class TransactionLatchGuard {
+   public:
+    explicit TransactionLatchGuard(Transaction *txn) : txn_(txn) { txn->LockTxn(); }
+    ~TransactionLatchGuard() { txn_->UnlockTxn(); }
+
+   private:
+    Transaction *txn_;
   };
 
   /**
@@ -101,6 +114,7 @@ class LockManager {
    *
    * GENERAL BEHAVIOUR:
    *    Both LockTable() and LockRow() are blocking methods; they should wait till the lock is granted and then return.
+   *    // TODO(SMLZ)重要!!!
    *    If the transaction was aborted in the meantime, do not grant the lock and return false.
    *
    *
@@ -159,6 +173,7 @@ class LockManager {
    *      - 2. Drop the current lock, reserve the upgrade position
    *      - 3. Wait to get the new lock granted
    *
+        // TODO(SMLZ) ???
    *    A lock request being upgraded should be prioritized over other waiting lock requests on the same resource.
    *
    *    While upgrading, only the following transitions should be allowed:
@@ -319,16 +334,38 @@ class LockManager {
  private:
   /** Spring 2023 */
   /* You are allowed to modify all functions below. */
-  auto UpgradeLockTable(Transaction *txn, LockMode lock_mode, const table_oid_t &oid) -> bool;
-  auto UpgradeLockRow(Transaction *txn, LockMode lock_mode, const table_oid_t &oid, const RID &rid) -> bool;
+  // auto UpgradeLockTable(Transaction *txn, LockMode lock_mode, const table_oid_t &oid) -> bool;
+  // auto UpgradeLockRow(Transaction *txn, LockMode lock_mode, const table_oid_t &oid, const RID &rid) -> bool;
+  auto UpgradeLockTable(Transaction *txn, LockMode current_lock_mode, LockMode lock_mode, const table_oid_t &oid)
+      -> bool;
+  auto UpgradeLockRow(Transaction *txn, LockMode current_lock_mode, LockMode lock_mode, const table_oid_t &oid,
+                      const RID &rid) -> bool;
   auto AreLocksCompatible(LockMode l1, LockMode l2) -> bool;
+
   auto CanTxnTakeLock(Transaction *txn, LockMode lock_mode) -> bool;
-  void GrantNewLocksIfPossible(LockRequestQueue *lock_request_queue);
+  auto CanTxnTakeTableLock(Transaction *txn, LockMode lock_mode) -> bool;
+  auto CanTxnTakeRowLock(Transaction *txn, LockMode lock_mode) -> bool;
+
+  // void GrantNewLocksIfPossible(LockRequestQueue *lock_request_queue);
+  void GrantNewLocksIfPossible(LockRequestQueue *lock_request_queue, LockMode lock_mode, Transaction *txn,
+                               const table_oid_t &oid);
   auto CanLockUpgrade(LockMode curr_lock_mode, LockMode requested_lock_mode) -> bool;
+
   auto CheckAppropriateLockOnTable(Transaction *txn, const table_oid_t &oid, LockMode row_lock_mode) -> bool;
-  auto FindCycle(txn_id_t source_txn, std::vector<txn_id_t> &path, std::unordered_set<txn_id_t> &on_path,
-                 std::unordered_set<txn_id_t> &visited, txn_id_t *abort_txn_id) -> bool;
+
+  // auto FindCycle(txn_id_t source_txn, std::vector<txn_id_t> &path, std::unordered_set<txn_id_t> &on_path,
+  //                std::unordered_set<txn_id_t> &visited, txn_id_t *abort_txn_id) -> bool;
+
+  void DFS(txn_id_t current_txn, std::vector<txn_id_t> &cycle_stack, std::vector<std::vector<txn_id_t>> &all_cycles,
+           std::map<txn_id_t, bool> &in_cycle, std::map<txn_id_t, bool> &visited);
+
   void UnlockAll();
+
+  auto GetCurrentRowLockMode(Transaction *txn, const table_oid_t &oid, const RID &rid) -> std::optional<LockMode>;
+  auto GetCurrentTableLockMode(Transaction *txn, const table_oid_t &oid) -> std::optional<LockMode>;
+
+  auto AquireLockTable(Transaction *txn, LockMode lock_mode, const table_oid_t &oid) -> bool;
+  auto AquireLockRow(Transaction *txn, LockMode lock_mode, const table_oid_t &oid, const RID &rid) -> bool;
 
   /** Structure that holds lock requests for a given table oid */
   std::unordered_map<table_oid_t, std::shared_ptr<LockRequestQueue>> table_lock_map_;
@@ -345,6 +382,13 @@ class LockManager {
   /** Waits-for graph representation. */
   std::unordered_map<txn_id_t, std::vector<txn_id_t>> waits_for_;
   std::mutex waits_for_latch_;
+
+  // Lock compatibility table
+  bool lock_compatibility_table_[5][5] = {{true, false, true, false, false},
+                                          {false, false, false, false, false},
+                                          {true, false, true, true, true},
+                                          {false, false, true, true, false},
+                                          {false, false, true, false, false}};
 };
 
 }  // namespace bustub

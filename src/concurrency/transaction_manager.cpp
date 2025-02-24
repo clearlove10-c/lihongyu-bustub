@@ -18,8 +18,10 @@
 #include <unordered_set>
 
 #include "catalog/catalog.h"
+#include "common/config.h"
 #include "common/macros.h"
 #include "storage/table/table_heap.h"
+#include "storage/table/tuple.h"
 
 namespace bustub {
 
@@ -31,8 +33,14 @@ void TransactionManager::Commit(Transaction *txn) {
 }
 
 void TransactionManager::Abort(Transaction *txn) {
-  /* TODO: revert all the changes in write set */
-
+  auto table_write_set = txn->GetWriteSet();
+  for (const auto &table_write_record : *table_write_set) {
+    auto rid = table_write_record.rid_;
+    auto table_heap = table_write_record.table_heap_;
+    auto tuple_meta = table_heap->GetTupleMeta(rid);
+    tuple_meta.is_deleted_ = !tuple_meta.is_deleted_;
+    table_heap->UpdateTupleMeta(tuple_meta, rid);
+  }
   ReleaseLocks(txn);
 
   txn->SetState(TransactionState::ABORTED);

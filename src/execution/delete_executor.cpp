@@ -43,6 +43,8 @@ auto DeleteExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
   while (status) {
     // delete old
     table_info_->table_->UpdateTupleMeta(delete_meta, old_rid);
+    // update write set
+    ts_->AppendTableWriteRecord(TableWriteRecord(ts_->GetTransactionId(), old_rid, table_info_->table_.get()));
     // update index
     for (auto index : indexes_info_) {
       Tuple index_tuple =
